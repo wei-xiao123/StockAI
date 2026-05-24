@@ -1,0 +1,10 @@
+fastapi==0.136.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+pydantic-settings==2.10.1
+python-dotenv==1.2.2
+akshare==1.17.80
+pandas==2.3.2
+supabase==2.18.1
+httpx==0.28.1
+starlette==1.0.1
