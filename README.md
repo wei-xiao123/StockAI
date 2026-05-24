@@ -1,8 +1,8 @@
 # AI股票分析助手
 
-一个面向 A 股场景的 AI 股票分析面板，提供多周期 K 线概览、结构化 AI 研判、登录口令校验、会话隔离和历史记录追溯。
+一个面向 A 股场景的 AI 股票分析助手，提供多周期 K 线概览、结构化 AI 研判、登录口令校验、会话隔离和历史记录追溯。
+线上地址：`https://stockai-wxiao.onrender.com`
 
-项目规范见 [docs/project-spec.md](/E:/work/StockAI/docs/project-spec.md)。
 
 ## 功能概览
 
@@ -152,58 +152,3 @@ ENABLE_LOCAL_MARKET_DATA_FALLBACK=true
 5. 点击“运行 AI 分析”
 6. 检查分析结果是否展示
 7. 打开历史记录页，确认该会话下的数据可见
-
-## 部署说明
-
-项目当前采用单服务部署：
-
-- FastAPI 提供 `/api/*`
-- FastAPI 同时托管前端静态产物
-- 前端与后端共用一个域名
-
-这套结构的好处是：
-
-- 不需要单独处理跨域 Cookie
-- 不需要前端额外反向代理 `/api`
-- 刷新前端路由时可直接走后端 SPA fallback
-
-## Render 部署
-
-仓库根目录已提供 [render.yaml](/E:/work/StockAI/render.yaml)。
-
-当前 Blueprint 会创建一个 Docker Web Service：
-
-- 服务名：`stockai-wxiao`
-- 线上地址：`https://stockai-wxiao.onrender.com`
-
-部署前需要在 Render 中配置：
-
-- `ACCESS_PASSWORD`
-- `SILICONFLOW_API_KEY`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Render 会自动生成：
-
-- `SESSION_SIGNING_SECRET`
-
-默认生产配置：
-
-- `APP_ENV=production`
-- `API_PREFIX=/api`
-- `SESSION_COOKIE_SAMESITE=lax`
-- `SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash`
-- `ENABLE_LOCAL_ANALYSIS_FALLBACK=false`
-- `ENABLE_LOCAL_MARKET_DATA_FALLBACK=false`
-
-## 安全说明
-
-- 不要把真实 `backend/.env` 提交到 Git 仓库
-- 如果密钥曾经暴露，必须去对应平台轮换
-- `SUPABASE_SERVICE_ROLE_KEY` 应使用 Supabase 的服务端密钥，不要暴露给前端
-- 生产环境建议替换默认访问口令，并使用足够长的 `SESSION_SIGNING_SECRET`
-
-## 其他说明
-
-- 当前仓库以根目录 `README.md` 作为唯一主文档维护
-- 后端不再单独维护一份 README
