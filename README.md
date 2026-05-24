@@ -1,31 +1,53 @@
-# StockAI
+# AI股票分析助手
 
-AI 股票分析面板项目。
+一个面向 A 股场景的 AI 股票分析面板，提供多周期 K 线概览、结构化 AI 研判、登录口令校验、会话隔离和历史记录追溯。
 
-项目规范见 [docs/project-spec.md](docs/project-spec.md)。
+项目规范见 [docs/project-spec.md](/E:/work/StockAI/docs/project-spec.md)。
 
-## 目录
+## 功能概览
 
-- `frontend/`: React + TypeScript + Vite 前端
-- `backend/`: FastAPI 后端
-- `supabase/init.sql`: Supabase 初始化 SQL
+- 6 位 A 股代码查询
+- 日 K、周 K、月 K 多周期图表和均线展示
+- 基于 SiliconFlow `deepseek-ai/DeepSeek-V4-Flash` 的结构化 AI 分析
+- 访问口令登录与后端会话校验
+- 基于 Supabase 的历史记录保存与按用户隔离查询
+- 前后端同域部署，生产环境只暴露一个站点域名
 
-## 本地启动
+## 技术栈
 
-### 前端
+- 前端：React 19 + TypeScript + Vite + Tailwind CSS + ECharts
+- 后端：FastAPI + Pydantic + Pandas + AkShare
+- AI：SiliconFlow API
+- 存储：Supabase
+- 部署：Render Docker Web Service
 
-```bash
-cd frontend
-npm install
-npm run dev
+## 项目结构
+
+```text
+StockAI/
+├─ frontend/              # React 前端
+├─ backend/               # FastAPI 后端
+├─ supabase/init.sql      # Supabase 初始化脚本
+├─ docs/project-spec.md   # 项目规格说明
+├─ Dockerfile             # 单服务部署镜像
+└─ render.yaml            # Render Blueprint
 ```
 
-说明：
-- 本地开发默认不需要填写 `VITE_API_BASE_URL`
-- 留空时前端会直接使用相对路径 `/api/*`，通过 Vite 代理转发到本地后端
-- 只有在你明确需要绕过代理时，才设置成完整后端地址
+## 运行模式
 
-### 后端
+项目支持两种模式：
+
+1. 真实云服务模式
+   - 使用 SiliconFlow 生成 AI 分析
+   - 使用 Supabase 保存和查询历史记录
+   - 使用 AkShare 拉取真实行情
+2. 本地 fallback 模式
+   - 未配置云服务时，可退回本地分析和本地演示行情
+   - 便于本地开发和演示联调
+
+## 本地开发
+
+### 1. 后端
 
 ```bash
 cd backend
@@ -35,71 +57,153 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-说明：
-- 后端会稳定读取 `backend/.env`，不依赖你从哪个目录启动命令
-- 即使你不配置 `SILICONFLOW_API_KEY`，项目也能本地使用：
-  - AI 分析会自动退回到本地规则分析
-  - 行情接口在外部数据源不可用时会自动返回本地演示数据
-- 如果你不配置 `SUPABASE_*`：
-  - AI 分析结果仍会返回给前端
-  - 历史记录保存与历史记录查询接口会不可用
+默认地址：
 
-### 后端测试
+- API: `http://127.0.0.1:8000`
+- 健康检查: `http://127.0.0.1:8000/api/health`
+
+### 2. 前端
 
 ```bash
-cd backend
-python -m unittest discover -s tests -v
+cd frontend
+npm install
+npm run dev
 ```
 
-## 本地可用模式
+默认地址：
 
-默认只在未接入 Supabase 的情况下支持下面这条本地链路：
+- 前端：`http://localhost:5174`
 
-1. 启动后端 `uvicorn app.main:app --reload`
-2. 启动前端 `npm run dev`
-3. 打开 `http://localhost:5174`
-4. 输入任意 6 位股票代码，例如 `600519`
-5. 查看概览图表
-6. 点击“运行 AI 分析”
-7. 在当前页面查看 AI 分析结果
+本地开发时，Vite 会自动把 `/api/*` 代理到 `http://127.0.0.1:8000`。
 
-本地 fallback 说明：
-- `SiliconFlow` 未配置时，分析结果由后端本地规则引擎生成
-- `Supabase` 未配置时，分析结果不会保存，历史记录页接口不可用
-- `AkShare` 不可用时，概览页会展示本地演示行情
+## 环境变量
 
-如果你之后要切回真实云服务，只需要在 `backend/.env` 中填写：
-- `SESSION_SIGNING_SECRET`
+后端读取 [backend/.env.example](/E:/work/StockAI/backend/.env.example) 作为模板。实际运行时使用 `backend/.env`。
+
+核心变量如下：
+
+```env
+APP_ENV=development
+API_PREFIX=/api
+FRONTEND_ORIGIN=http://localhost:5174,http://127.0.0.1:5174
+
+ACCESS_PASSWORD=rongxi
+SESSION_SIGNING_SECRET=replace-with-at-least-16-characters
+SESSION_COOKIE_SAMESITE=lax
+
+SILICONFLOW_API_KEY=
+SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
+
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+
+ENABLE_LOCAL_ANALYSIS_FALLBACK=true
+ENABLE_LOCAL_MARKET_DATA_FALLBACK=true
+```
+
+说明：
+
+- `ACCESS_PASSWORD`：访问口令
+- `SESSION_SIGNING_SECRET`：会话签名密钥
+- `SILICONFLOW_*`：AI 分析配置
+- `SUPABASE_*`：历史记录存储配置
+- `ENABLE_LOCAL_ANALYSIS_FALLBACK`：未接入 AI 时是否允许本地规则分析
+- `ENABLE_LOCAL_MARKET_DATA_FALLBACK`：外部行情不可用时是否允许本地演示行情
+
+## Supabase 初始化
+
+首次接入 Supabase 时，执行：
+
+- [supabase/init.sql](/E:/work/StockAI/supabase/init.sql)
+
+执行完成后，后端即可保存分析记录，并按用户会话隔离历史数据。
+
+## 核心接口
+
+认证：
+
+- `POST /api/auth/login`
+- `POST /api/auth/logout`
+- `GET /api/auth/me`
+
+行情：
+
+- `GET /api/stocks/{symbol}/overview`
+
+分析：
+
+- `POST /api/analyses`
+- `GET /api/analyses`
+- `GET /api/analyses/{analysis_id}`
+
+系统：
+
+- `GET /api/health`
+
+## 本地验收建议
+
+在本地启动前后端后，可按下面顺序验证：
+
+1. 打开 `http://localhost:5174`
+2. 输入访问口令登录
+3. 查询股票代码，例如 `600519`
+4. 检查日 K、周 K、月 K 是否正常渲染
+5. 点击“运行 AI 分析”
+6. 检查分析结果是否展示
+7. 打开历史记录页，确认该会话下的数据可见
+
+## 部署说明
+
+项目当前采用单服务部署：
+
+- FastAPI 提供 `/api/*`
+- FastAPI 同时托管前端静态产物
+- 前端与后端共用一个域名
+
+这套结构的好处是：
+
+- 不需要单独处理跨域 Cookie
+- 不需要前端额外反向代理 `/api`
+- 刷新前端路由时可直接走后端 SPA fallback
+
+## Render 部署
+
+仓库根目录已提供 [render.yaml](/E:/work/StockAI/render.yaml)。
+
+当前 Blueprint 会创建一个 Docker Web Service：
+
+- 服务名：`stockai-wxiao`
+- 线上地址：`https://stockai-wxiao.onrender.com`
+
+部署前需要在 Render 中配置：
+
+- `ACCESS_PASSWORD`
 - `SILICONFLOW_API_KEY`
-- `SILICONFLOW_MODEL`
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-前端开发服务器默认运行在 `http://localhost:5174`，并通过 Vite 代理将 `/api/*` 转发到 `http://127.0.0.1:8000`。
+Render 会自动生成：
 
-## Render 部署准备
+- `SESSION_SIGNING_SECRET`
 
-仓库根目录已经提供 `render.yaml`，用于在 Render 上创建单个 Docker Web Service：
+默认生产配置：
 
-- `stockai-wxiao`：FastAPI + 前端静态产物同域部署
+- `APP_ENV=production`
+- `API_PREFIX=/api`
+- `SESSION_COOKIE_SAMESITE=lax`
+- `SILICONFLOW_MODEL=deepseek-ai/DeepSeek-V4-Flash`
+- `ENABLE_LOCAL_ANALYSIS_FALLBACK=false`
+- `ENABLE_LOCAL_MARKET_DATA_FALLBACK=false`
 
-部署前需要准备：
+## 安全说明
 
-1. 在 Render 中连接当前 GitHub 仓库，并以根目录 `render.yaml` 作为 Blueprint。
-2. 首次创建 Blueprint 时，按提示填写所有 `sync: false` 的环境变量：
-   - `ACCESS_PASSWORD`
-   - `SILICONFLOW_API_KEY`
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-3. 后端会自动生成 `SESSION_SIGNING_SECRET`。
-4. 当前 Blueprint 会将前端打包进同一个 Docker 服务中：
-   - 用户只访问一个域名：`https://stockai-wxiao.onrender.com`
-   - 前端页面和 `/api/*` 接口由同一个 Render 服务提供
-5. 后端生产环境默认使用：
-   - `SESSION_COOKIE_SAMESITE=lax`
+- 不要把真实 `backend/.env` 提交到 Git 仓库
+- 如果密钥曾经暴露，必须去对应平台轮换
+- `SUPABASE_SERVICE_ROLE_KEY` 应使用 Supabase 的服务端密钥，不要暴露给前端
+- 生产环境建议替换默认访问口令，并使用足够长的 `SESSION_SIGNING_SECRET`
 
-注意：
+## 其他说明
 
-- Render Blueprint 中 `sync: false` 的变量只会在首次创建时提示输入，后续更新 Blueprint 时不会再次提示。
-- 当前 FastAPI 已内置前端静态文件托管和 SPA fallback，直接访问 `/history` 不会因为前端路由导致 404。
-- 当前部署模式不再需要单独的 Render Static Site，也不再依赖前端域名反向代理 `/api`。
+- 当前仓库以根目录 `README.md` 作为唯一主文档维护
+- 后端不再单独维护一份 README
