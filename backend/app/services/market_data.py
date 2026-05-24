@@ -19,8 +19,11 @@ from app.schemas.stock import (
     VolumePoint,
 )
 
-HISTORY_WINDOW = 180
-LOOKBACK_DAYS = 720
+DAILY_HISTORY_WINDOW = 180
+WEEKLY_HISTORY_WINDOW = 156
+MONTHLY_HISTORY_WINDOW = 60
+LOCAL_FALLBACK_TRADE_DAYS = 1260
+LOOKBACK_DAYS = 3650
 REQUEST_TIMEOUT = 10.0
 
 
@@ -45,9 +48,18 @@ def get_stock_overview(symbol: str) -> StockOverviewResponse:
         raise
 
     stock_name = _fetch_stock_name(symbol)
-    daily_history = _normalize_history_frame(daily_history_df)
-    weekly_history = _normalize_history_frame(_resample_history(daily_history, "W-FRI"))
-    monthly_history = _normalize_history_frame(_resample_history(daily_history, "ME"))
+    full_history = _normalize_history_frame(daily_history_df, history_window=None)
+    daily_history = _normalize_history_frame(daily_history_df, history_window=DAILY_HISTORY_WINDOW)
+    weekly_history = _resample_history(
+        full_history,
+        "W-FRI",
+        history_window=WEEKLY_HISTORY_WINDOW,
+    )
+    monthly_history = _resample_history(
+        full_history,
+        "ME",
+        history_window=MONTHLY_HISTORY_WINDOW,
+    )
     latest_row = daily_history.iloc[-1]
 
     return StockOverviewResponse(
@@ -164,7 +176,11 @@ def _fetch_stock_name(symbol: str) -> str:
     return stock_name or symbol
 
 
-def _normalize_history_frame(history_df: pd.DataFrame) -> pd.DataFrame:
+def _normalize_history_frame(
+    history_df: pd.DataFrame,
+    *,
+    history_window: int | None = DAILY_HISTORY_WINDOW,
+) -> pd.DataFrame:
     normalized_df = history_df.copy()
     normalized_df["日期"] = pd.to_datetime(normalized_df["日期"], errors="coerce")
 
@@ -182,10 +198,17 @@ def _normalize_history_frame(history_df: pd.DataFrame) -> pd.DataFrame:
     normalized_df["ma5"] = normalized_df["收盘"].rolling(window=5, min_periods=1).mean()
     normalized_df["ma10"] = normalized_df["收盘"].rolling(window=10, min_periods=1).mean()
     normalized_df["ma20"] = normalized_df["收盘"].rolling(window=20, min_periods=1).mean()
-    return normalized_df.tail(HISTORY_WINDOW).reset_index(drop=True)
+    if history_window is not None:
+        normalized_df = normalized_df.tail(history_window)
+    return normalized_df.reset_index(drop=True)
 
 
-def _resample_history(history_df: pd.DataFrame, rule: str) -> pd.DataFrame:
+def _resample_history(
+    history_df: pd.DataFrame,
+    rule: str,
+    *,
+    history_window: int | None = None,
+) -> pd.DataFrame:
     resampled = history_df.copy()
     resampled = resampled.set_index("日期").sort_index()
     aggregated = resampled.resample(rule).agg(
@@ -204,7 +227,9 @@ def _resample_history(history_df: pd.DataFrame, rule: str) -> pd.DataFrame:
     aggregated["ma5"] = aggregated["收盘"].rolling(window=5, min_periods=1).mean()
     aggregated["ma10"] = aggregated["收盘"].rolling(window=10, min_periods=1).mean()
     aggregated["ma20"] = aggregated["收盘"].rolling(window=20, min_periods=1).mean()
-    return aggregated.tail(HISTORY_WINDOW).reset_index(drop=True)
+    if history_window is not None:
+        aggregated = aggregated.tail(history_window)
+    return aggregated.reset_index(drop=True)
 
 
 def _build_chart_data(history_df: pd.DataFrame) -> StockChartData:
@@ -255,7 +280,10 @@ def _to_sina_symbol(symbol: str) -> str:
 
 
 def _build_local_fallback_overview(symbol: str) -> StockOverviewResponse:
-    trade_dates = pd.bdate_range(end=pd.Timestamp.today().normalize(), periods=HISTORY_WINDOW)
+    trade_dates = pd.bdate_range(
+        end=pd.Timestamp.today().normalize(),
+        periods=LOCAL_FALLBACK_TRADE_DAYS,
+    )
     seed = int(symbol[-3:])
     base_price = 20 + (seed % 180)
     trend = ((seed % 11) - 5) / 10
@@ -286,8 +314,19 @@ def _build_local_fallback_overview(symbol: str) -> StockOverviewResponse:
         )
         last_close = close
 
-    history_slice = _normalize_history_frame(pd.DataFrame(rows))
-    latest_row = history_slice.iloc[-1]
+    full_history = _normalize_history_frame(pd.DataFrame(rows), history_window=None)
+    daily_history = _normalize_history_frame(full_history, history_window=DAILY_HISTORY_WINDOW)
+    latest_row = daily_history.iloc[-1]
+    weekly_history = _resample_history(
+        full_history,
+        "W-FRI",
+        history_window=WEEKLY_HISTORY_WINDOW,
+    )
+    monthly_history = _resample_history(
+        full_history,
+        "ME",
+        history_window=MONTHLY_HISTORY_WINDOW,
+    )
 
     return StockOverviewResponse(
         symbol=symbol,
@@ -302,26 +341,10 @@ def _build_local_fallback_overview(symbol: str) -> StockOverviewResponse:
             volume=_to_float(latest_row["成交量"]),
             amount=_to_float(latest_row["成交额"]),
         ),
-        chart=StockChartData(
-            candles=[
-                CandlePoint(
-                    trade_date=_to_iso_date(row["日期"]),
-                    open=_to_float(row["开盘"]),
-                    close=_to_float(row["收盘"]),
-                    low=_to_float(row["最低"]),
-                    high=_to_float(row["最高"]),
-                )
-                for _, row in history_slice.iterrows()
-            ],
-            volumes=[
-                VolumePoint(
-                    trade_date=_to_iso_date(row["日期"]),
-                    volume=_to_float(row["成交量"]),
-                )
-                for _, row in history_slice.iterrows()
-            ],
-            ma5=_build_moving_average(history_slice, "ma5"),
-            ma10=_build_moving_average(history_slice, "ma10"),
-            ma20=_build_moving_average(history_slice, "ma20"),
+        chart=_build_chart_data(daily_history),
+        charts=StockChartViews(
+            daily=_build_chart_data(daily_history),
+            weekly=_build_chart_data(weekly_history),
+            monthly=_build_chart_data(monthly_history),
         ),
     )
