@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: stockai-wxiao
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: API_PREFIX
+        value: /api
+      - key: FRONTEND_ORIGIN
+        value: https://stockai-wxiao.onrender.com
+      - key: ACCESS_PASSWORD
+        sync: false
+      - key: SESSION_SIGNING_SECRET
+        generateValue: true
+      - key: SESSION_COOKIE_SAMESITE
+        value: lax
+      - key: SILICONFLOW_API_KEY
+        sync: false
+      - key: SILICONFLOW_MODEL
+        value: deepseek-ai/DeepSeek-V4-Flash
+      - key: SILICONFLOW_BASE_URL
+        value: https://api.siliconflow.cn/v1
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ENABLE_LOCAL_ANALYSIS_FALLBACK
+        value: "false"
+      - key: ENABLE_LOCAL_MARKET_DATA_FALLBACK
+        value: "false"

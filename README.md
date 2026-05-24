@@ -76,3 +76,30 @@ python -m unittest discover -s tests -v
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 前端开发服务器默认运行在 `http://localhost:5174`，并通过 Vite 代理将 `/api/*` 转发到 `http://127.0.0.1:8000`。
+
+## Render 部署准备
+
+仓库根目录已经提供 `render.yaml`，用于在 Render 上创建单个 Docker Web Service：
+
+- `stockai-wxiao`：FastAPI + 前端静态产物同域部署
+
+部署前需要准备：
+
+1. 在 Render 中连接当前 GitHub 仓库，并以根目录 `render.yaml` 作为 Blueprint。
+2. 首次创建 Blueprint 时，按提示填写所有 `sync: false` 的环境变量：
+   - `ACCESS_PASSWORD`
+   - `SILICONFLOW_API_KEY`
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+3. 后端会自动生成 `SESSION_SIGNING_SECRET`。
+4. 当前 Blueprint 会将前端打包进同一个 Docker 服务中：
+   - 用户只访问一个域名：`https://stockai-wxiao.onrender.com`
+   - 前端页面和 `/api/*` 接口由同一个 Render 服务提供
+5. 后端生产环境默认使用：
+   - `SESSION_COOKIE_SAMESITE=lax`
+
+注意：
+
+- Render Blueprint 中 `sync: false` 的变量只会在首次创建时提示输入，后续更新 Blueprint 时不会再次提示。
+- 当前 FastAPI 已内置前端静态文件托管和 SPA fallback，直接访问 `/history` 不会因为前端路由导致 404。
+- 当前部署模式不再需要单独的 Render Static Site，也不再依赖前端域名反向代理 `/api`。

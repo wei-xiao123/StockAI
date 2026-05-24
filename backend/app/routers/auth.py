@@ -24,6 +24,7 @@ def login(payload: LoginRequest, response: Response) -> SessionResponse:
     if not verify_access_password(payload.password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="访问口令错误。")
 
+    settings = get_settings()
     session = create_session_context()
     expires_at = build_session_expiry()
     create_user_session(session_id=session.session_id, user_id=session.user_id, expires_at=expires_at)
@@ -32,8 +33,8 @@ def login(payload: LoginRequest, response: Response) -> SessionResponse:
         key=SESSION_COOKIE_NAME,
         value=cookie_value,
         httponly=True,
-        samesite="lax",
-        secure=get_settings().app_env == "production",
+        samesite=settings.session_cookie_samesite,
+        secure=settings.resolved_session_cookie_secure,
         max_age=60 * 60 * 24 * 30,
         path="/",
     )
@@ -42,13 +43,19 @@ def login(payload: LoginRequest, response: Response) -> SessionResponse:
 
 @router.post("/logout")
 def logout(response: Response, session_cookie: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME)) -> dict[str, str]:
+    settings = get_settings()
     if session_cookie:
         try:
             session = require_session(session_cookie)
             revoke_user_session(session.session_id)
         except HTTPException:
             pass
-    response.delete_cookie(SESSION_COOKIE_NAME, path="/")
+    response.delete_cookie(
+        SESSION_COOKIE_NAME,
+        path="/",
+        secure=settings.resolved_session_cookie_secure,
+        samesite=settings.session_cookie_samesite,
+    )
     return {"status": "ok"}
 
 

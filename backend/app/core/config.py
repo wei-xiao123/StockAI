@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     siliconflow_base_url: str = "https://api.siliconflow.cn/v1"
     supabase_url: str = ""
     supabase_service_role_key: str = ""
+    session_cookie_samesite: str = "lax"
+    session_cookie_secure: bool | None = None
     enable_local_analysis_fallback: bool = True
     enable_local_market_data_fallback: bool = True
 
@@ -37,6 +39,14 @@ class Settings(BaseSettings):
             raise ValueError("session_signing_secret must be at least 16 characters long")
         return secret
 
+    @field_validator("session_cookie_samesite")
+    @classmethod
+    def validate_session_cookie_samesite(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in {"lax", "strict", "none"}:
+            raise ValueError("session_cookie_samesite must be one of: lax, strict, none")
+        return normalized
+
     @property
     def cors_origins(self) -> list[str]:
         origins = [item.strip() for item in self.frontend_origin.split(",") if item.strip()]
@@ -45,6 +55,12 @@ class Settings(BaseSettings):
         if "http://127.0.0.1:5174" not in origins:
             origins.append("http://127.0.0.1:5174")
         return list(dict.fromkeys(origins))
+
+    @property
+    def resolved_session_cookie_secure(self) -> bool:
+        if self.session_cookie_secure is not None:
+            return self.session_cookie_secure
+        return self.app_env == "production"
 
 
 @lru_cache
