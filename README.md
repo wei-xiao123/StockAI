@@ -16,7 +16,7 @@
 ## 操作说明
 
 1. 打开线上地址
-2. 输入访问口令 `rongxi`
+2. 输入访问口令 `wxiao`
 3. 在首页输入 6 位股票代码
 4. 点击查询并运行 AI 分析
 5. 可以在历史记录页查看当前会话的数据
@@ -307,7 +307,7 @@ APP_ENV=development
 API_PREFIX=/api
 FRONTEND_ORIGIN=http://localhost:5174,http://127.0.0.1:5174
 
-ACCESS_PASSWORD=rongxi
+ACCESS_PASSWORD=wxiao
 SESSION_SIGNING_SECRET=replace-with-at-least-16-characters
 SESSION_COOKIE_SAMESITE=lax
 
