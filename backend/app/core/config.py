@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     api_prefix: str = "/api"
     frontend_origin: str = "http://localhost:5174,http://127.0.0.1:5174"
-    access_password: str = "rongxi"
+    access_password: str = "wxiao"
     session_signing_secret: str = Field(min_length=16)
     siliconflow_api_key: str = ""
     siliconflow_model: str = "deepseek-ai/DeepSeek-V4-Flash"
